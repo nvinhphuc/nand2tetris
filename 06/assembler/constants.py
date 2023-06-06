@@ -1,3 +1,6 @@
+A_INSTRUCTION_PREFIX = "0"
+C_INSTRUCTION_PREFIX = "111"
+
 DEST_TABLE = {
     "": "000",
     "M": "001",

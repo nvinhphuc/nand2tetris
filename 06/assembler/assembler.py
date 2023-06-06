@@ -1,6 +1,6 @@
 import argparse
 from typing import List, Tuple
-from constants import DEST_TABLE, JUMP_TABLE, COMP_TABLE, PREDEFINED_SYMBOLS
+from constants import DEST_TABLE, JUMP_TABLE, COMP_TABLE, PREDEFINED_SYMBOLS, A_INSTRUCTION_PREFIX, C_INSTRUCTION_PREFIX
 from utils import dec2bin
 import logging
 
@@ -15,7 +15,7 @@ class Parser:
         else: # is symbol address
             logging.info(f"SYMBOL: {address}, value: {self.symbol_table[address]}")
             bin_address = dec2bin(decimal=self.symbol_table[address], num_bits=15)
-        return "0" + bin_address
+        return A_INSTRUCTION_PREFIX + bin_address
     
     def __split_c_instruction(self, line):
         parts = line.split("=")
@@ -39,7 +39,7 @@ class Parser:
     
     def __parse_c_instruction(self, line):
         dest, comp, jump = self.__split_c_instruction(line)
-        return "111" + COMP_TABLE[comp] + DEST_TABLE[dest] + JUMP_TABLE[jump]
+        return C_INSTRUCTION_PREFIX + COMP_TABLE[comp] + DEST_TABLE[dest] + JUMP_TABLE[jump]
     
     def parse(self, lines):
         instructions = []
