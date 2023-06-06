@@ -1,15 +1,20 @@
 import argparse
-from constants import DEST_TABLE, JUMP_TABLE, COMP_TABLE
+from typing import List, Tuple
+from constants import DEST_TABLE, JUMP_TABLE, COMP_TABLE, PREDEFINED_SYMBOLS
 from utils import dec2bin
 import logging
 
 class Parser:
-    def __init__(self):
-        return
+    def __init__(self, symbol_table):
+        self.symbol_table = symbol_table
     
     def __parse_a_instruction(self, line):
-        address = int(line[1:])
-        bin_address = dec2bin(decimal=address, num_bits=15)
+        address = line[1:]
+        if (address[0] >= '0' and address[0] <= '9'): # is number address
+            bin_address = dec2bin(decimal=int(address), num_bits=15)
+        else: # is symbol address
+            logging.info(f"SYMBOL: {address}, value: {self.symbol_table[address]}")
+            bin_address = dec2bin(decimal=self.symbol_table[address], num_bits=15)
         return "0" + bin_address
     
     def __split_c_instruction(self, line):
@@ -38,39 +43,71 @@ class Parser:
     
     def parse(self, lines):
         instructions = []
-        for line, location in lines:
+        for line in lines:
             try:
                 if line[0] == "@": # A-instruction
                     instructions.append(self.__parse_a_instruction(line))
+                elif line[0] == "(": # Symbol declaration
+                    continue
                 else: # C-instruction
                     instructions.append(self.__parse_c_instruction(line))
             except Exception:
-                logging.error(f"line: {line}, location: {location}")
+                logging.error(f"line: {line}")
         return instructions
 
 class Assembler:
     def __init__(self):
-        self.parser = Parser()
+        return
     
     def __read_source(self, source_path):
         lines = []
-        location = 1
         with open(source_path, "r") as source:
             for line in source:
                 line = line.strip()
                 ignore = line.startswith("//") or line == ""
                 if not ignore:
-                    lines.append((line, location))
-                    location += 1
+                    lines.append(line.split("//")[0].strip())
         return lines
     
     def __write_to_dest(self, instructions, dest_path):
         with open(dest_path, "w") as dest:
             dest.writelines(inst + "\n" for inst in instructions)
+
+    def __build_symbol_tables(self, lines):
+        symbol_table = {**PREDEFINED_SYMBOLS}
+
+        def get_labels(lines: List[str]):
+            location = 0
+            for line in lines:
+                if line.startswith("("):
+                    label = line[1:-1] # Remove first "(" and last ")" characters
+                    logging.info(f"label: {label}, location: {location}")
+                    if (symbol_table.get(label) is None):
+                        symbol_table[label] = location
+                    else:
+                        raise Exception(f'Keyword "{label}" have already existed!')
+                    continue
+                location += 1
+                    
+        def get_variables(lines: List[str]):
+            ram_address = 16 # In HACK platform, the RAM space designated for storing variables starts at 16
+            for line in lines:
+                if line.startswith("@") and not (line[1] >= '0' and line[1] <= '9'):
+                    variable = line[1:]
+                    if (symbol_table.get(variable) is None):
+                        symbol_table[variable] = ram_address
+                        ram_address += 1
+        
+        get_labels(lines)
+        get_variables(lines)
+
+        return symbol_table
     
     def assemble(self, source_path, dest_path):
         lines = self.__read_source(source_path)
-        instructions = self.parser.parse(lines)
+        symbol_table = self.__build_symbol_tables(lines)
+        parser = Parser(symbol_table)
+        instructions = parser.parse(lines)
         self.__write_to_dest(instructions, dest_path)
     
 
