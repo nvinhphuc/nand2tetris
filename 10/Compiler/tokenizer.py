@@ -63,19 +63,20 @@ class Tokenizer:
         if (len(self.token_queue) > 0):
             return True
         else:
-            current_line = self.source_file.readline()
-            self.current_line = current_line
-            if (current_line == ''):
-                return False
-            else:
-                self.tokenize_a_line(current_line)
-                return True
+            while (True):
+                # Run until we can get the next available token
+                current_line = self.source_file.readline()
+                self.current_line = current_line
+                if (current_line == ''):
+                    return False
+                else:
+                    self.tokenize_a_line(current_line)
+                    if len(self.token_queue) > 0:
+                        return True
             
     def advance(self):
-        if len(self.token_queue) > 0:
-            self.current_token = self.token_queue.pop(0)
-        else:
-            self.current_token = None
+        ### Always called after has_more_tokens method
+        self.current_token = self.token_queue.pop(0)
         return self.current_token
 
     def token_type(self) -> TokenType:
@@ -126,20 +127,17 @@ if __name__ == "__main__":
             xml_file.write("<tokens>\n")
             while (tokenizer.has_more_tokens()):
                 current_token = tokenizer.advance()
-                if current_token == None:
-                    continue
-                print(f"current_token: {current_token}")
                 current_token_type = tokenizer.token_type()
                 xml_token = to_xml_text(current_token)
                 if (current_token_type == TokenType.KEYWORD):
-                    xml_file.write(f"<keyword> {xml_token} </keyword>\n")
+                    xml_file.write(f"<{TokenType.KEYWORD.value}> {xml_token} </{TokenType.KEYWORD.value}>\n")
                 elif (current_token_type == TokenType.SYMBOL):
-                    xml_file.write(f"<symbol> {xml_token} </symbol>\n")
+                    xml_file.write(f"<{TokenType.SYMBOL.value}> {xml_token} </{TokenType.SYMBOL.value}>\n")
                 elif (current_token_type == TokenType.IDENTIFIER):
-                    xml_file.write(f"<identifier> {xml_token} </identifier>\n")
+                    xml_file.write(f"<{TokenType.IDENTIFIER.value}> {xml_token} </{TokenType.IDENTIFIER.value}>\n")
                 elif (current_token_type == TokenType.INT_CONST):
-                    xml_file.write(f"<integerConstant> {xml_token} </integerConstant>\n")
+                    xml_file.write(f"<{TokenType.INT_CONST.value}> {xml_token} </{TokenType.INT_CONST.value}>\n")
                 elif (current_token_type == TokenType.STRING_CONST):
-                    xml_file.write(f"<stringConstant> {to_xml_text(tokenizer.string_val())} </stringConstant>\n")
+                    xml_file.write(f"<{TokenType.STRING_CONST.value}> {to_xml_text(tokenizer.string_val())} </{TokenType.STRING_CONST.value}>\n")
             
             xml_file.write("</tokens>\n")

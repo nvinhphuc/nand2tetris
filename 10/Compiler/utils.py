@@ -1,3 +1,9 @@
+from uuid import uuid4
+
+
+def gen_uuid4():
+    return str(uuid4())
+
 def is_number(str):
     for char in str:
         if (char < '0' or char > '9'): return False
