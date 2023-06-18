@@ -102,7 +102,10 @@ class Compiler:
 
     def compile_if_is_symbol_in(self, parent, symbols):
         if self.is_symbol_in(symbols=symbols): self.compile_symbol(parent)
-        else: raise SyntaxError
+        else:
+            logging.error(f"current token: {self.tokenizer.current_token}")
+            self.print_parsed_tree()
+            raise SyntaxError
 
     def compile_if_is_identifier(self, parent):
         if self.is_identifier(): self.compile_identifier(parent)
@@ -311,15 +314,15 @@ class Compiler:
 
         if self.is_symbol_in(symbols={"["}):
             self.compile_symbol(parent=let_statement_id)
-            self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id)
-            self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=let_statement_id, symbols={"]"})
+            self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id) # already advance to the next token
+            self.compile_if_is_symbol_in(parent=let_statement_id, symbols={"]"})
             self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=let_statement_id, symbols={"="})
-            self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id)
-            self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=let_statement_id, symbols={";"})
+            self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id) # already advance to the next token
+            self.compile_if_is_symbol_in(parent=let_statement_id, symbols={";"})
         elif self.is_symbol_in(symbols={"="}):
             self.compile_symbol(parent=let_statement_id)
             self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id)
-            self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=let_statement_id, symbols={";"})
+            self.compile_if_is_symbol_in(parent=let_statement_id, symbols={";"})
 
     def compile_if(self, parent):
         if_statement_id = gen_uuid4()
@@ -328,8 +331,8 @@ class Compiler:
 
         self.compile_if_is_keyword_in(parent=if_statement_id, keywords={Keyword.IF})
         self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=if_statement_id, symbols={"("})
-        self.__advance_and_do_compile(self.compile_expression, parent=if_statement_id)
-        self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=if_statement_id, symbols={")"})
+        self.__advance_and_do_compile(self.compile_expression, parent=if_statement_id) # already advance to the next token
+        self.compile_if_is_symbol_in(parent=if_statement_id, symbols={")"})
         self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=if_statement_id, symbols={"{"})
         self.__advance_and_do_compile(self.compile_statements, parent=if_statement_id) # already advance to the next token
         self.compile_if_is_symbol_in(parent=if_statement_id, symbols={"}"})
@@ -352,8 +355,8 @@ class Compiler:
 
         self.compile_if_is_keyword_in(parent=while_statement_id, keywords={Keyword.WHILE})
         self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=while_statement_id, symbols={"("})
-        self.__advance_and_do_compile(self.compile_expression, parent=while_statement_id)
-        self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=while_statement_id, symbols={")"})
+        self.__advance_and_do_compile(self.compile_expression, parent=while_statement_id) # already advance to the next token
+        self.compile_if_is_symbol_in(parent=while_statement_id, symbols={")"})
         self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=while_statement_id, symbols={"{"})
         self.__advance_and_do_compile(self.compile_statements, parent=while_statement_id) # already advance to the next token
         self.compile_if_is_symbol_in(parent=while_statement_id, symbols={"}"})
@@ -365,8 +368,6 @@ class Compiler:
         self.parsed_tree[parent]["children"].append(do_statement_id)
 
         self.compile_if_is_keyword_in(parent=do_statement_id, keywords={Keyword.DO})
-        # self.__advance_and_do_compile(self.compile_subroutine_call, parent=do_statement_id) # already advance to the next token
-
         self.__advance_and_do_compile(self.compile_identifier, parent=do_statement_id)
         self.__advance_and_do_compile(self.compile_nothing)
         if self.is_symbol_in(symbols={"("}):
@@ -401,8 +402,8 @@ class Compiler:
         if self.is_symbol_in(symbols={";"}):
             self.compile_symbol(parent=return_statement_id)
         elif self.is_possibly_term():
-            self.compile_expression(parent=return_statement_id)
-            self.__advance_and_do_compile(self.compile_symbol, parent=return_statement_id) # compile ;
+            self.compile_expression(parent=return_statement_id) # already advance to the next token
+            self.compile_symbol(parent=return_statement_id) # compile ;
 
 
     def is_int_const(self):
@@ -410,81 +411,74 @@ class Compiler:
     
     def is_string_const(self):
         return self.tokenizer.token_type() == TokenType.STRING_CONST
-    
-    # def is_op(self):
-    #     return self.is_symbol_in({"+", "-", "*", "/", "&", "|", "<", ">", "="})
 
     def compile_expression(self, parent):
         expression_id = gen_uuid4()
         self.parsed_tree[expression_id] = new_node(tag="expression")
         self.parsed_tree[parent]["children"].append(expression_id)
 
-        self.compile_term(parent=expression_id)
-
-        # if self.is_looked_ahead:
-        #     if self.is_op():
-        #         self.compile_symbol(parent)
-        #         self.is_looked_ahead = False
-        #         self.__advance_and_do_compile(self.compile_term)
-        #     else:
-        #         pass
-        # else:
-        #     self.__advance_and_do_compile(self.compile_nothing)
-        #     if self.is_op():
-        #         self.compile_symbol(parent)
-        #         self.__advance_and_do_compile(self.compile_term)
-        #     else:
-        #         pass
-
-
-
+        while self.is_possibly_term():
+            self.compile_term(parent=expression_id)
+            if self.is_symbol_in({"+", "-", "*", "/", "&", "|", "<", ">", "="}): # op
+                self.compile_symbol(parent=expression_id)
+                self.__advance_and_do_compile(self.compile_nothing)
+            else:
+                return
 
     def compile_term(self, parent):
         term_id = gen_uuid4()
         self.parsed_tree[term_id] = new_node(tag="term")
         self.parsed_tree[parent]["children"].append(term_id)
 
-        if self.is_int_const(): self.compile_int_const(parent=term_id)
-        elif self.is_string_const(): self.compile_string_const(parent=term_id)
-        elif self.is_keyword_in(keywords={Keyword.TRUE, Keyword.FALSE, Keyword.NULL, Keyword.THIS}): self.compile_keyword(parent=term_id)
-        elif self.is_identifier:
-            self.compile_identifier(parent=term_id)
-            # self.__advance_and_do_compile(self.compile_nothing)
-            # if self.is_symbol_in(symbols={"["}):
-            #     self.compile_symbol(parent)
-            #     self.__advance_and_do_compile(self.compile_expression)
-            #     if self.is_looked_ahead:
-            #         self.compile_if_is_symbol_in({"]"})
-            #         self.is_looked_ahead = False
-            #     else:
-            #         self.__advance_and_do_compile(self.compile_if_is_symbol_in({"]"}))
-            # elif self.is_symbol_in(symbols={"("}):
-            #     self.compile_symbol(parent)
-            #     self.__advance_and_do_compile(self.compile_nothing)
-            #     if self.is_symbol_in(symbols={")"}):
-            #         self.compile_symbol(parent)
-            #     else:
-            #         self.compile_expression_list()
-            # elif self.is_symbol_in(symbols={"."}):
-            #     self.compile_symbol(parent)
-            #     self.__advance_and_do_compile(self.compile_identifier(parent))
-            #     self.__advance_and_do_compile(self.compile_nothing)
-            #     if self.is_symbol_in(symbols={"("}):
-            #         self.compile_symbol(parent)
-            #         self.__advance_and_do_compile(self.compile_nothing)
-            #         if self.is_symbol_in(symbols={")"}):
-            #             self.compile_symbol(parent)
-            #         else:
-            #             self.compile_expression_list()
-            # else:
-            #     self.is_looked_ahead = True
-        # elif self.is_symbol_in(symbols={"("}):
-        #     self.compile_symbol(parent)
-        #     self.compile_expression(parent)
-        #     self.__advance_and_do_compile(self.compile_closing_parenthesis(parent))
-        elif self.is_symbol_in(symbols={"-", "~"}):
+        if self.is_int_const():
+            self.compile_int_const(parent=term_id)
+            self.__advance_and_do_compile(self.compile_nothing)
+
+        elif self.is_string_const():
+            self.compile_string_const(parent=term_id)
+            self.__advance_and_do_compile(self.compile_nothing)
+
+        elif self.is_keyword_in(keywords={Keyword.TRUE, Keyword.FALSE, Keyword.NULL, Keyword.THIS}):
+            self.compile_keyword(parent=term_id)
+            self.__advance_and_do_compile(self.compile_nothing)
+
+        elif self.is_symbol_in(symbols={"-", "~"}): # unaryOp
             self.compile_symbol(parent=term_id)
-            self.__advance_and_do_compile(self.compile_term(parent=term_id))
+            self.__advance_and_do_compile(self.compile_term, parent=term_id)
+            
+        elif self.is_symbol_in({"+", "-", "*", "/", "&", "|", "<", ">", "="}): # op
+            self.compile_symbol(parent=term_id)
+            self.__advance_and_do_compile(self.compile_nothing)
+
+        elif self.is_symbol_in(symbols={"("}):
+            self.compile_symbol(parent=term_id)
+            self.__advance_and_do_compile(self.compile_expression, parent=term_id) # already advance to the next token
+            self.compile_if_is_symbol_in(parent=term_id, symbols={")"})
+            self.__advance_and_do_compile(self.compile_nothing)
+
+        elif self.is_identifier:
+            self.previous_token = self.tokenizer.current_token
+            self.compile_identifier(parent=term_id)
+            self.__advance_and_do_compile(self.compile_nothing)
+            if (self.is_symbol_in({"["})):
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_expression, parent=term_id) # already advance to the next token
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_nothing)
+            elif (self.is_symbol_in({"("})):
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_expression_list, parent=term_id) # already advance to the next token
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_nothing)
+            elif (self.is_symbol_in({"."})):
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_identifier, parent=term_id)
+                self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=term_id, symbols={"("})
+                self.__advance_and_do_compile(self.compile_expression_list, parent=term_id) # already advance to the next token
+                self.compile_symbol(parent=term_id)
+                self.__advance_and_do_compile(self.compile_nothing)
+            else:
+                return
         else:
             raise SyntaxError
         
@@ -501,8 +495,7 @@ class Compiler:
         self.parsed_tree[parent]["children"].append(expression_list_id)
 
         while self.is_possibly_term():
-            self.compile_expression(parent=expression_list_id)
-            self.__advance_and_do_compile(self.compile_nothing)
+            self.compile_expression(parent=expression_list_id) # already advance to the next token
             if (self.is_symbol_in(symbols={","})):
                 self.compile_symbol(parent=expression_list_id)
                 self.__advance_and_do_compile(self.compile_nothing)
