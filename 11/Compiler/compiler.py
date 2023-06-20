@@ -141,9 +141,9 @@ class Compiler:
         self.__advance_and_do_compile(self.compile_class_keyword, parent=class_root_id)
         self.__advance_and_do_compile(self.compile_class_name, parent=class_root_id)
         self.__advance_and_do_compile(self.compile_opening_bracket, parent=class_root_id)
+        self.__advance_and_do_compile(self.compile_nothing)
 
-        while (self.tokenizer.has_more_tokens()):
-            self.tokenizer.advance()
+        while True:
             if self.is_keyword_in(keywords={Keyword.STATIC, Keyword.FIELD}):
                 self.compile_class_var_dec(parent=class_root_id)
             elif self.is_keyword_in(keywords={Keyword.CONSTRUCTOR, Keyword.FUNCTION, Keyword.METHOD}):
@@ -164,6 +164,7 @@ class Compiler:
         self.compile_static_field(parent=class_var_dec_root_id)
         self.__advance_and_do_compile(self.compile_type, parent=class_var_dec_root_id)
         self.__advance_and_do_compile(self.compile_var_name_list, parent=class_var_dec_root_id)
+        self.__advance_and_do_compile(self.compile_nothing)
             
     def compile_var_name_list(self, parent):
         self.compile_var_name(parent=parent)
@@ -186,6 +187,7 @@ class Compiler:
         self.compile_if_is_keyword_in(parent=var_dec_id, keywords={Keyword.VAR})
         self.__advance_and_do_compile(self.compile_type, parent=var_dec_id)
         self.__advance_and_do_compile(self.compile_var_name_list, parent=var_dec_id)
+        self.__advance_and_do_compile(self.compile_nothing)
 
     def compile_subroutine(self, parent):
         subroutine_root_id = gen_uuid4()
@@ -205,16 +207,15 @@ class Compiler:
         self.parsed_tree[parent]["children"].append(subroutine_body_id)
 
         self.compile_opening_bracket(parent=subroutine_body_id)
-        while (self.tokenizer.has_more_tokens()):
-            self.tokenizer.advance()
-            if self.is_keyword_in({Keyword.VAR}):
-                self.compile_var_dec(parent=subroutine_body_id)
-            else:
-                break
+        self.__advance_and_do_compile(self.compile_nothing)
+
+        while self.is_keyword_in({Keyword.VAR}):
+            self.compile_var_dec(parent=subroutine_body_id)
 
         self.compile_statements(parent=subroutine_body_id) # already advance at the next token
 
         if self.is_symbol_in("}"): self.compile_symbol(parent=subroutine_body_id)
+        self.__advance_and_do_compile(self.compile_nothing)
         
 
     def compile_subroutine_constructor_function_method(self, parent):
@@ -287,18 +288,14 @@ class Compiler:
         while (self.is_keyword_in(keywords={Keyword.LET, Keyword.IF, Keyword.WHILE, Keyword.DO, Keyword.RETURN})):
             if (self.is_keyword_in({Keyword.LET})):
                 self.compile_let(parent=statements_id)
-                self.__advance_and_do_compile(self.compile_nothing)
             elif (self.is_keyword_in({Keyword.IF})):
                 self.compile_if(parent=statements_id) # already advance to the next token
             elif (self.is_keyword_in({Keyword.WHILE})):
                 self.compile_while(parent=statements_id)
-                self.__advance_and_do_compile(self.compile_nothing)
             elif (self.is_keyword_in({Keyword.DO})):
                 self.compile_do(parent=statements_id)
-                self.__advance_and_do_compile(self.compile_nothing)
             elif (self.is_keyword_in({Keyword.RETURN})):
                 self.compile_return(parent=statements_id)
-                self.__advance_and_do_compile(self.compile_nothing)
             else:
                 return
 
@@ -323,6 +320,8 @@ class Compiler:
             self.compile_symbol(parent=let_statement_id)
             self.__advance_and_do_compile(self.compile_expression, parent=let_statement_id)
             self.compile_if_is_symbol_in(parent=let_statement_id, symbols={";"})
+
+        self.__advance_and_do_compile(self.compile_nothing)
 
     def compile_if(self, parent):
         if_statement_id = gen_uuid4()
@@ -360,6 +359,7 @@ class Compiler:
         self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=while_statement_id, symbols={"{"})
         self.__advance_and_do_compile(self.compile_statements, parent=while_statement_id) # already advance to the next token
         self.compile_if_is_symbol_in(parent=while_statement_id, symbols={"}"})
+        self.__advance_and_do_compile(self.compile_nothing)
 
 
     def compile_do(self, parent):
@@ -375,6 +375,7 @@ class Compiler:
             self.__advance_and_do_compile(self.compile_expression_list, parent=do_statement_id) # already advance to the next token
             self.compile_symbol(parent=do_statement_id) # symbol ")"
             self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=do_statement_id, symbols={";"})
+            self.__advance_and_do_compile(self.compile_nothing)
         elif self.is_symbol_in(symbols={"."}):
             self.compile_symbol(parent=do_statement_id)
             self.__advance_and_do_compile(self.compile_identifier, parent=do_statement_id)
@@ -384,12 +385,12 @@ class Compiler:
                 self.__advance_and_do_compile(self.compile_expression_list, parent=do_statement_id) # already advance to the next token
                 self.compile_symbol(parent=do_statement_id) # symbol ")""
                 self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=do_statement_id, symbols={";"})
+                self.__advance_and_do_compile(self.compile_nothing)
             elif self.is_symbol_in(symbols={";"}):
                 self.__advance_and_do_compile(self.compile_if_is_symbol_in, parent=do_statement_id, symbols={";"})
-            else:
-                return
-        else:
-            return
+                self.__advance_and_do_compile(self.compile_nothing)
+            else: pass
+        else: pass
         
 
     def compile_return(self, parent):
@@ -404,6 +405,7 @@ class Compiler:
         elif self.is_possibly_term():
             self.compile_expression(parent=return_statement_id) # already advance to the next token
             self.compile_symbol(parent=return_statement_id) # compile ;
+        self.__advance_and_do_compile(self.compile_nothing)
 
 
     def is_int_const(self):
@@ -514,4 +516,3 @@ if __name__ == "__main__":
             compiler = Compiler(source_file=source, dest_file=dest)
             compiler.compile_class()
             compiler.write_to_dest(compiler.root_id)
-            # compiler.print_parsed_tree()
