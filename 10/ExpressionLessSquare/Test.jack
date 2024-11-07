@@ -1,4 +1,0 @@
-class Main {
-    static boolean test;
-    static boolean hello;
-}
